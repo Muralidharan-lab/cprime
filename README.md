@@ -139,7 +139,7 @@ variable "cluster_endpoint_public_access_cidrs" {
 }
 
 # EKS Node Group Variables
-Step-03: c5-03-iamrole-for-eks-cluster.tf
+ c5-03-iamrole-for-eks-cluster.tf
 # Create IAM Role
 resource "aws_iam_role" "eks_master_role" {
   name = "${local.name}-eks-master-role"
@@ -202,8 +202,8 @@ resource "aws_iam_role_policy_attachment" "eks-AmazonEC2ContainerRegistryReadOnl
   role       = aws_iam_role.eks_nodegroup_role.name
 }
 # c5-05-securitygroups-eks.tf
-# Security Group for EKS Node Group - Placeholder file
-Step-06: c5-06-eks-cluster.tf
+# Security Group for EKS Node Group
+c5-06-eks-cluster.tf
 # Create AWS EKS Cluster
 resource "aws_eks_cluster" "eks_cluster" {
   name     = "${local.name}-${var.cluster_name}"
@@ -231,7 +231,8 @@ resource "aws_eks_cluster" "eks_cluster" {
     aws_iam_role_policy_attachment.eks-AmazonEKSVPCResourceController,
   ]
 }
-Step-07: c5-07-eks-node-group-public.tf
+
+eks-node-group-public.tf
 # Create AWS EKS Node Group - Public
 resource "aws_eks_node_group" "eks_ng_public" {
   cluster_name    = aws_eks_cluster.eks_cluster.name
@@ -275,7 +276,8 @@ resource "aws_eks_node_group" "eks_ng_public" {
     Name = "Public-Node-Group"
   }
 }
-Step-08: c5-08-eks-node-group-private.tf
+
+eks-node-group-private.tf
 # Create AWS EKS Node Group - Private
 resource "aws_eks_node_group" "eks_ng_private" {
   cluster_name    = aws_eks_cluster.eks_cluster.name
@@ -326,7 +328,8 @@ cluster_version = "1.26"
 cluster_endpoint_private_access = true
 cluster_endpoint_public_access = true
 cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
-Step-10: c5-02-eks-outputs.tf
+
+c5-02-eks-outputs.tf
 # EKS Cluster Outputs
 output "cluster_id" {
   description = "The name/id of the EKS cluster."
@@ -448,13 +451,20 @@ aws eks --region us-east-1 update-kubeconfig --name hr-stag-eksdemo1
 # List Worker Nodes
 kubectl get nodes
 kubectl get nodes -o wide
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/8fb8fb19-0a82-4d1d-b58c-180e27c2f56d)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/ad7a7d3b-bc81-4745-93e0-49113ebd60a3)
+
 
 # Verify Services
 kubectl get svc
-Step-15: Connect to EKS Worker Nodes using Bastion Host
+
+
+Connect to EKS Worker Nodes using Bastion Host
 # Connect to Bastion EC2 Instance
 ssh -i private-key/eks-terraform-key.pem ec2-user@<Bastion-EC2-Instance-Public-IP>
 cd /tmp
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/f45f5bed-6fba-4daa-889f-a45ad7595bcb)
+
 
 # Connect to Kubernetes Worker Nodes - Public Node Group
 ssh -i private-key/eks-terraform-key.pem ec2-user@<Public-NodeGroup-EC2Instance-PublicIP> 
@@ -473,42 +483,20 @@ cat /etc/kubernetes/kubelet/kubelet-config.json
 
 # Verify kubelet kubeconfig
 cat /var/lib/kubelet/kubeconfig
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/34da17e5-8186-487a-acef-05b5a6d27f24)
 
-# Verify clusters.cluster.server value(EKS Cluster API Server Endpoint)  DNS resolution which is taken from kubeconfig
-nslookup <EKS Cluster API Server Endpoint>
-nslookup CF89341F3269FB40F03AAB19E695DBAD.gr7.us-east-1.eks.amazonaws.com
-Very Important Note: Test this on Bastion Host, as EKS worker nodes doesnt have nslookup tool installed. 
-[or]
 # Verify clusters.cluster.server value(EKS Cluster API Server Endpoint)   with wget 
 Try with wget on Node Group EC2 Instances (both public and private)
 wget <Kubernetes API Server Endpoint>
 wget https://0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/0d0e7dbe-dbb4-4f65-85a4-468637497f01)
 
-## Output
-[ec2-user@ip-10-0-2-205 ~]$ wget https://0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com
---2021-12-30 08:40:50--  https://0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com/
-Resolving 0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com (0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com)... 54.243.111.82, 34.197.138.103
-Connecting to 0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com (0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com)|54.243.111.82|:443... connected.
-ERROR: cannot verify 0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com's certificate, issued by ‘/CN=kubernetes’:
-  Unable to locally verify the issuer's authority.
-To connect to 0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com insecurely, use `--no-check-certificate'.
-[ec2-user@ip-10-0-2-205 ~]$
-
-
-# Verify Pod Infra Container for Kubelete
-Example: --pod-infra-container-image=602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/pause:3.1-eksbuild.1
-Observation:
-1. This Pod Infra container will be downloaded from AWS Elastic Container Registry ECR
-2. All the EKS related system pods also will be downloaded from AWS ECR only
-Step-16: Verify Namespaces and Resources in Namespaces
+ Verify Namespaces and Resources in Namespaces
 # Verify Namespaces
 kubectl get namespaces
 kubectl get ns 
-Observation: 4 namespaces will be listed by default
-1. kube-node-lease
-2. kube-public
-3. default
-4. kube-system
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/e83b725c-b5d9-4f92-91f6-86cb9507aaaa)
+
 
 # Verify Resources in kube-node-lease namespace
 kubectl get all -n kube-node-lease
@@ -523,25 +511,22 @@ Observation:
 
 # Verify Resources in kube-system namespace
 kubectl get all -n kube-system
-Observation: 
-1. Kubernetes Deployment: coredns
-2. Kubernetes DaemonSet: aws-node, kube-proxy
-3. Kubernetes Service: kube-dns
-4. Kubernetes Pods: coredns, aws-node, kube-proxy
-Step-17: Verify pods in kube-system namespace
-# Verify System pods in kube-system namespace
-kubectl get pods # Nothing in default namespace
-kubectl get pods -n kube-system
-kubectl get pods -n kube-system -o wide
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/b5d5776c-4d28-4408-a123-153bafecd4b5)
+
+# Verify System pods 
+kubectl get pods
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/421f58da-7e67-4032-b3c6-cbc905f3a64b)
 
 # Verify Daemon Sets in kube-system namespace
 kubectl get ds -n kube-system
-Observation: The below two daemonsets will be running
-1. aws-node
-2. kube-proxy
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/32cc2dae-eb7d-4980-82f2-1f0679b05eec)
 
 # Describe aws-node Daemon Set
 kubectl describe ds aws-node -n kube-system 
 
 # Describe kube-proxy Daemon Set
 kubectl describe ds kube-proxy -n kube-system
+
+#Sample nginx deployment:
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/287f5170-22c4-42de-a574-d7d6eca06d23)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/54e22072-b0f6-4229-8fd2-245bbbe833e1)
