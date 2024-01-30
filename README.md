@@ -4,9 +4,11 @@ Architecture:
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/ba64f249-5b0f-4b46-bf60-c1966cbce70d)
 
 //
-Configure Terraform backend for aws devops:
-  Terraform Backends (make sure bucket is already there and use latest terraform version)
- Create DynamoDB Tables  for Terraform State Locking
+Configure Terraform backend:
+ 
+Terraform Backends (make sure bucket is already there and use latest terraform version)
+ 
+**Create DynamoDB Tables  for Terraform State Locking**
 steps:
 Table Name: iacdevops-dev-tfstate
 Partition key (Primary Key): LockID (Type as String)
@@ -14,7 +16,7 @@ Table settings: Use default settings (checked)
 Click on Create
 
 terraform.tfvars which autoloads for all environment creations will have only generic variables.
-Create Secure Parameters in Parameter Store for AWS credentials
+**Create Secure Parameters in Parameter Store for AWS credentials**
 sample:
 'Go to Services -> Systems Manager -> Application Management -> Parameter Store -> Create Parameter
 Name: /CodeBuild/MY_AWS_ACCESS_KEY_ID
@@ -23,7 +25,7 @@ Tier: Standard
 Type: Secure String
 Rest all defaults
 Value: <value of access key >
-create buildspec-dev.yml  = where we are going to use terraform comments for EKS deployments
+create buildspec.yml(for plan) and appspec.yml (for apply) = where we are going to use terraform comments for EKS deployments
 //
 
 👍AWS Codepipline:
@@ -77,9 +79,6 @@ Rest all leave to defaults
 Click on Continue to CodePipeline
 Project Name: This value should be auto-populated
 Build Type: Single Build
-Click Next
-Add Deploy Stage
-Click on Skip Deploy Stage
 Review Stage
 Click on Create Pipeline
 
