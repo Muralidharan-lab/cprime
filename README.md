@@ -1,5 +1,8 @@
 # cprime
 Task : Create AWS EKS Cluster and Node Groups using Terraform via AWS DevOps
+Architecture:
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/ba64f249-5b0f-4b46-bf60-c1966cbce70d)
+
 //
 Configure Terraform backend for aws devops:
   Terraform Backends (make sure bucket is already there and use latest terraform version)
@@ -31,7 +34,7 @@ create buildspec-dev.yml  = where we are going to use terraform comments for EKS
 2. create code build
    ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/e0f6014e-22e2-42dd-b9f0-0e87ab07b51a)
 
-5. create codepipeline
+3. create codepipeline
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/0a05ccb3-0854-4dec-8dbe-cc3074e752f6)
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/28465c9f-6813-4549-bd3e-060d2ceed953)
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/9396d2c4-3417-48fb-bc4d-a5179de40b80)
@@ -82,10 +85,8 @@ Click on Create Pipeline
 
 4.Create IAM Policy with Systems Manager Get Parameter Read Permission and attached to codepipeline roles.
 
-
-
-
-👍Terraform Configs Folder: check terraform-manifests folder for all codes
+//
+👍Terraform Configs Folder: **check terraform-manifests folder for all codes**
 c1-versions.tf
 c2-01-generic-variables.tf
 c2-02-local-values.tf
@@ -99,8 +100,8 @@ c4-04-ami-datasource.tf
 c4-05-ec2bastion-instance.tf
 c4-06-ec2bastion-elasticip.tf
 c4-07-ec2bastion-provisioners.tf
-
-👍variable ceclaration
+//
+👍variable part
 c5-01-eks-variables.tf
 # EKS Cluster Input Variables
 variable "cluster_name" {
@@ -427,7 +428,7 @@ output "node_group_private_version" {
 
 ✌️Run the Aws DevOps pipeline then  check the plan and apply  (create drift pipeline to check plans daily)
 
-👌 Verify the following Services using AWS Management Console
+👌 **Verify the following Services using AWS Management Console**
 Go to Services -> Elastic Kubernetes Service -> Clusters
 Verify the following
 Overview
@@ -444,9 +445,13 @@ Tags
 Step-13: Install kubectl CLI
 Install kubectl CLI
 Step-14: Configure kubeconfig for kubectl
-# Configure kubeconfig for kubectl
+
+# Install Kubectl on bastion host and Configure kubeconfig for kubectl
+https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html
+
+update config:
 aws eks --region <region-code> update-kubeconfig --name <cluster_name>
-aws eks --region us-east-1 update-kubeconfig --name hr-stag-eksdemo1
+aws eks --region us-east-1 update-kubeconfig --name hr-dev-eksdemo1
 
 # List Worker Nodes
 kubectl get nodes
@@ -463,8 +468,6 @@ Connect to EKS Worker Nodes using Bastion Host
 # Connect to Bastion EC2 Instance
 ssh -i private-key/eks-terraform-key.pem ec2-user@<Bastion-EC2-Instance-Public-IP>
 cd /tmp
-![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/f45f5bed-6fba-4daa-889f-a45ad7595bcb)
-
 
 # Connect to Kubernetes Worker Nodes - Public Node Group
 ssh -i private-key/eks-terraform-key.pem ec2-user@<Public-NodeGroup-EC2Instance-PublicIP> 
@@ -473,6 +476,7 @@ ec2-user@<Public-NodeGroup-EC2Instance-PrivateIP>
 
 # Connect to Kubernetes Worker Nodes - Private Node Group from Bastion Host
 ssh -i eks-terraform-key.pem ec2-user@<Private-NodeGroup-EC2Instance-PrivateIP>
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/f45f5bed-6fba-4daa-889f-a45ad7595bcb)
 
 ##### REPEAT BELOW STEPS ON BOTH PUBLIC AND PRIVATE NODE GROUPS ####
 # Verify if kubelet and kube-proxy running
@@ -491,7 +495,10 @@ wget <Kubernetes API Server Endpoint>
 wget https://0cbda14fd801e669f05c2444fb16d1b5.gr7.us-east-1.eks.amazonaws.com
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/0d0e7dbe-dbb4-4f65-85a4-468637497f01)
 
- Verify Namespaces and Resources in Namespaces
+--------------------------------------------------------------------------
+
+
+**Verify Namespaces and Resources in Namespaces**
 # Verify Namespaces
 kubectl get namespaces
 kubectl get ns 
@@ -527,6 +534,6 @@ kubectl describe ds aws-node -n kube-system
 # Describe kube-proxy Daemon Set
 kubectl describe ds kube-proxy -n kube-system
 
-#Sample nginx deployment:
+**Sample nginx deployment**
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/287f5170-22c4-42de-a574-d7d6eca06d23)
 ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/54e22072-b0f6-4229-8fd2-245bbbe833e1)
