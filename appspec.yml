@@ -32,14 +32,13 @@ phases:
       - terraform --version
       - terraform init 
       - terraform validate
-      - terraform plan -out=tfplan -input=false     
+      - terraform plan -out=tfplan -input=false 
+       
   post_build:
     on-failure: CONTINUE   
     commands:
-      - echo terraform execution completed on `date`  
-      - terraform destroy
-
-
+        - terraform apply tfplan
+        - echo terraform execution completed on `date`  
 
 
 
