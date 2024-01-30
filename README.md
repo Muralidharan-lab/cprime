@@ -1,6 +1,6 @@
 # cprime
 Task : Create AWS EKS Cluster and Node Groups using Terraform via AWS DevOps
-
+//
 Configure Terraform backend for aws devops:
   Terraform Backends (make sure bucket is already there and use latest terraform version)
  Create DynamoDB Tables  for Terraform State Locking
@@ -21,13 +21,27 @@ Type: Secure String
 Rest all defaults
 Value: <value of access key >
 create buildspec-dev.yml  = where we are going to use terraform comments for EKS deployments
+//
 
-AWS Codepipline:
+👍AWS Codepipline:
 
 1. Create code commit
+   ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/a7b4eba4-db36-4a86-b8dd-2fb27df49ff4)
+
 2. create code build
-3. create codepipeline 
+   ![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/e0f6014e-22e2-42dd-b9f0-0e87ab07b51a)
+
+5. create codepipeline
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/0a05ccb3-0854-4dec-8dbe-cc3074e752f6)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/28465c9f-6813-4549-bd3e-060d2ceed953)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/9396d2c4-3417-48fb-bc4d-a5179de40b80)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/8a24e6b4-a401-4c91-bacf-b5278edce65e)
+![image](https://github.com/Muralidharan-lab/cprime/assets/63875844/b7fa4493-a96b-43b2-a501-32b6f6a0cebe)
+
+
+
 steps:
+
 Go to Services -> CodePipeline -> Create Pipeline
 Pipeline settings
 Pipeline Name: <pipeline name>
