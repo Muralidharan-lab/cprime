@@ -1731,3 +1731,429 @@ BUG FIX:
 
 Drift Impact:
 - Yes
+
+user_data = folder
+init_dr.tpl
+<powershell>
+$check = Get-ItemPropertyValue -Path "HKLM:\Software\Alight" -Name "ec2_region"
+If ($check -match "nomoreuserdata") {
+  Break
+}
+ElseIf ($check -match "adjoin") {
+ $(
+Write-Output "hostname change starting"
+$CustomHostname = "${hostname}"
+
+$token = Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token-ttl-seconds" = "21600"} -Method PUT -Uri http://169.254.169.254/latest/api/token
+$hostip = (Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token" = $token} -Method GET -Uri http://169.254.169.254/latest/meta-data/local-ipv4).ToString()
+$splitIP = $hostip.Split('.')
+$GeneratedHostname = $("{0:X2}" -f [int]$splitIP[0]) + $("{0:X2}" -f [int]$splitIP[1]) + $("{0:X2}" -f [int]$splitIP[2]) + $("{0:X2}" -f [int]$splitIP[3])
+Write-Output "Generated hostname: $GeneratedHostname  "
+$host_name = (Get-WmiObject Win32_Computersystem).name
+Write-Output "existing hostname: $host_name  "
+Write-Output "custom hostname:$CustomHostname   "
+
+Write-Output "AD join secret passwd from Terraform : ${adjoinsecret}"
+[string]$SecretAD = "${adjoinsecret}"
+
+# Make a request to the secret manager
+Write-Output "Reading  secrets"
+$secret_manager = Get-SECSecretValue -SecretId $SecretAD
+
+# Parse the response and convert the Secret String JSON into an object
+$secret = $secret_manager.SecretString | ConvertFrom-Json
+
+# Construct the domain credentials
+$username =  $secret.UserID
+$password = $secret.Password | ConvertTo-SecureString -AsPlainText -Force
+$domain = $secret.Domain
+Write-Output "Domain : $domain"
+Write-Output "domain user  : $username"
+
+# Set PS credentials
+$credential = New-Object System.Management.Automation.PSCredential($username,$password)
+
+# Perform the domain join
+If (  $CustomHostname )  {
+   Rename-Computer -NewName $CustomHostname  -Force
+   Add-Computer -DomainName $Secret.Domain -NewName $CustomHostname   -Credential $credential
+   Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $CustomHostname
+ }
+ else
+ {
+   if ($host_name -eq $GeneratedHostname) {
+
+      Write-Output "register existing hostname  to AD "
+      Add-Computer -DomainName $Secret.Domain -ComputerName $host_name  -Credential $credential
+      Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $host_name
+   }
+    else
+    {
+        Write-Output "Register generated hostname to AD "
+        Rename-Computer -NewName $GeneratedHostname -Force
+        Add-Computer -DomainName $Secret.Domain -NewName  $GeneratedHostname  -Credential $credential
+        Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $GeneratedHostname
+    }
+ }
+
+Write-Output "After AD join and before restart"
+# Update registry key to avoid user data to run on reboot
+Set-ItemProperty -Path "HKLM:\Software\Alight" -Name "ec2_region" -Value "nomoreuserdata"
+Restart-Computer -Force
+) *>&1 > c:\windows\Temp\DR-userdataout-adjoin.txt
+}
+Else {
+  $(
+Write-Output "Running Sysprep"
+C:\\ProgramData\\Amazon\\EC2-Windows\\Launch\\Scripts\\SysprepInstance.ps1 -NoShutdown
+Write-Output "Sysprep complete"
+If (-Not $check) {
+  Write-Output "ec2_region not found, creating it"
+  New-Item -Path HKLM:\Software\Alight
+  New-ItemProperty -Path "HKLM:\Software\Alight" -Name "ec2_region" -Value "adjoin"
+  Write-Output "ec2_region = adjoin"
+}
+Set-ItemProperty -Path "HKLM:\Software\Alight" -Name "ec2_region" -Value "adjoin"
+Restart-Computer -Force
+) *>&1 > c:\windows\Temp\DR-userdataout-sysprep.txt
+}
+</powershell>
+<persist>true</persist>
+init-fedprimary.tpl
+<powershell>
+$check = Get-ItemPropertyValue -Path "HKLM:\Software\Alight" -Name "ec2_region"
+If ($check -match "us-east-1")
+{
+    Break
+}
+Else {
+ $(
+
+Write-Output "hostname change starting"
+$CustomHostname = "${hostname}"
+
+$token = Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token-ttl-seconds" = "21600"} -Method PUT -Uri http://169.254.169.254/latest/api/token
+$hostip = (Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token" = $token} -Method GET -Uri http://169.254.169.254/latest/meta-data/local-ipv4).ToString()
+$splitIP = $hostip.Split('.')
+$GeneratedHostname = $("{0:X2}" -f [int]$splitIP[0]) + $("{0:X2}" -f [int]$splitIP[1]) + $("{0:X2}" -f [int]$splitIP[2]) + $("{0:X2}" -f [int]$splitIP[3])
+Write-Output "Generated hostname: $GeneratedHostname  "
+$host_name = (Get-WmiObject Win32_Computersystem).name
+Write-Output "existing hostname: $host_name  "
+Write-Output "custom hostname:$CustomHostname   "
+
+Write-Output "AD join secret passwd from Terraform : ${adjoinsecret}"
+[string]$SecretAD = "${adjoinsecret}"
+
+# init_fedprimary.tpl
+# Make a request to the secret manager
+Write-Output "Reading  secrets"
+$secret_manager = Get-SECSecretValue -SecretId $SecretAD
+
+# Parse the response and convert the Secret String JSON into an object
+$secret = $secret_manager.SecretString | ConvertFrom-Json
+
+# Construct the domain credentials
+$username =  $secret.UserID
+$password = $secret.Password | ConvertTo-SecureString -AsPlainText -Force
+$domain = $secret.Domain
+Write-Output "Domain : $domain"
+Write-Output "domain user  : $username"
+
+# Set PS credentials
+$credential = New-Object System.Management.Automation.PSCredential($username,$password)
+
+# Perform the domain join
+If (  $CustomHostname )  {
+   Rename-Computer -NewName $CustomHostname  -Force
+   Add-Computer -DomainName $Secret.Domain -NewName $CustomHostname   -Credential $credential
+   Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $CustomHostname
+ }
+ else
+ {
+   if ($host_name -eq $GeneratedHostname) {
+
+      Write-Output "register existing hostname  to AD "
+      Add-Computer -DomainName $Secret.Domain -ComputerName $host_name  -Credential $credential
+      Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $host_name
+   }
+    else
+    {
+        Write-Output "Register generated hostname to AD "
+        Rename-Computer -NewName $GeneratedHostname -Force
+        Add-Computer -DomainName $Secret.Domain -NewName  $GeneratedHostname  -Credential $credential
+        Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $GeneratedHostname
+    }
+ }
+
+Write-Output "After AD join and before restart"
+
+# Enable InitializeInstance.ps1 -SchedulePerBoot
+C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\InitializeInstance.ps1 -SchedulePerBoot
+New-Item -Path HKLM:\Software\Alight
+New-ItemProperty -Path "HKLM:\Software\Alight" -Name "ec2_region" -Value "us-east-1"
+
+#### Puppet agent setup.
+If ( $CustomHostname )  {
+  $puppetregistername="$CustomHostname.$domain".ToLower()
+}
+else {
+  $puppetregistername="$GeneratedHostname.$domain".ToLower()
+}
+
+# Remove SSL certs directory.
+remove-item -path "C:\ProgramData\PuppetLabs\puppet\etc\ssl" -Force -Recurse -ErrorAction Ignore
+remove-item -path "C:\ProgramData\PuppetLabs\puppet\etc\puppet.conf" -Force -Recurse -ErrorAction Ignore
+
+# Create csr_attributes.yaml
+mkdir -p C:\ProgramData\PuppetLabs\puppet\etc
+write-output "---" "${csr_attributes}" |out-file -append -encoding ascii C:\ProgramData\PuppetLabs\puppet\etc\csr_attributes.yaml
+
+# Install puppet and kick off catalog run.
+[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+$webClient = New-Object System.Net.WebClient; $webClient.DownloadFile('https://${puppet_hostname}:8140/packages/current/install.ps1', 'C:\Windows\Temp\install.ps1'); & C:\Windows\Temp\install.ps1 -v;
+remove-item -path "C:\Windows\Temp\install.ps1" -Force -Recurse -ErrorAction Ignore
+
+# Create puppet.conf
+stop-Service -Name "puppet"
+Set-Location "c:\Program Files\Puppet Labs\Puppet\bin\"
+.\puppet.bat config set --section main certname "$puppetregistername"
+.\puppet.bat config set --section agent ssl_trust_store "C:\ProgramData\PuppetLabs\puppet\etc\ssl\ca-trust.pem"
+.\puppet.bat agent -t
+
+# Apply security patches to mitigate known vulnerabilities
+$Updates = Start-WUScan
+Write-Host "Updates Found: " $Updates.Count
+if ($Updates.Count -gt 0) {
+  Install-WUUpdates -Updates $Updates
+  Write-Output "Windows Patches Installed Successfully"
+}
+
+Restart-Computer -Force
+) *>&1 > c:\windows\Temp\userdataout.txt
+}
+</powershell>
+<persist>true</persist>
+init-primary.tpl
+<powershell>
+$check = Get-ItemPropertyValue -Path "HKLM:\Software\Alight" -Name "ec2_region"
+If ($check -match "us-east-1")
+{
+    Break
+}
+Else {
+ $(
+
+Write-Output "hostname change starting"
+$CustomHostname = "${hostname}"
+
+$token = Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token-ttl-seconds" = "21600"} -Method PUT -Uri http://169.254.169.254/latest/api/token
+$hostip = (Invoke-RestMethod -Headers @{"X-aws-ec2-metadata-token" = $token} -Method GET -Uri http://169.254.169.254/latest/meta-data/local-ipv4).ToString()
+$splitIP = $hostip.Split('.')
+$GeneratedHostname = $("{0:X2}" -f [int]$splitIP[0]) + $("{0:X2}" -f [int]$splitIP[1]) + $("{0:X2}" -f [int]$splitIP[2]) + $("{0:X2}" -f [int]$splitIP[3])
+Write-Output "Generated hostname: $GeneratedHostname  "
+$host_name = (Get-WmiObject Win32_Computersystem).name
+Write-Output "existing hostname: $host_name  "
+Write-Output "custom hostname:$CustomHostname   "
+
+Write-Output "AD join secret passwd from Terraform : ${adjoinsecret}"
+[string]$SecretAD = "${adjoinsecret}"
+
+# Make a request to the secret manager
+Write-Output "Reading  secrets"
+$secret_manager = Get-SECSecretValue -SecretId $SecretAD
+
+# Parse the response and convert the Secret String JSON into an object
+$secret = $secret_manager.SecretString | ConvertFrom-Json
+
+# Construct the domain credentials
+$username =  $secret.UserID
+$password = $secret.Password | ConvertTo-SecureString -AsPlainText -Force
+$domain = $secret.Domain
+Write-Output "Domain : $domain"
+Write-Output "domain user  : $username"
+
+# Set PS credentials
+$credential = New-Object System.Management.Automation.PSCredential($username,$password)
+
+# Perform the domain join
+If (  $CustomHostname )  {
+   Rename-Computer -NewName $CustomHostname  -Force
+   Add-Computer -DomainName $Secret.Domain -NewName $CustomHostname   -Credential $credential
+   Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $CustomHostname
+ }
+ else
+ {
+   if ($host_name -eq $GeneratedHostname) {
+
+      Write-Output "register existing hostname  to AD "
+      Add-Computer -DomainName $Secret.Domain -ComputerName $host_name  -Credential $credential
+      Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $host_name
+   }
+    else
+    {
+        Write-Output "Register generated hostname to AD "
+        Rename-Computer -NewName $GeneratedHostname -Force
+        Add-Computer -DomainName $Secret.Domain -NewName  $GeneratedHostname  -Credential $credential
+        Send-SQSMessage -QueueUrl ${sqs_url} -MessageBody $GeneratedHostname
+    }
+ }
+
+Write-Output "After AD join and before restart"
+
+# Enable InitializeInstance.ps1 -SchedulePerBoot
+C:\ProgramData\Amazon\EC2-Windows\Launch\Scripts\InitializeInstance.ps1 -SchedulePerBoot
+New-Item -Path HKLM:\Software\Alight
+New-ItemProperty -Path "HKLM:\Software\Alight" -Name "ec2_region" -Value "us-east-1"
+
+### CPAM
+Write-Output "Saviynt credentials secret from Terraform : ${saviyntcredentialssecret}"
+[string]$Secretsaviynt = "${saviyntcredentialssecret}"
+
+Write-Output "Reading Saviynt secrets"
+$saviynt_secret_manager = Get-SECSecretValue -SecretId $Secretsaviynt
+
+# Parse the response and convert the Secret String JSON into an object
+$saviynt_secret = $saviynt_secret_manager.SecretString | ConvertFrom-Json
+
+# Construct the Saviynt credentials
+$Password = ConvertTo-SecureString $saviynt_secret.cpamwinpwd -AsPlainText -Force
+
+# Create Saviynt master user
+Write-Output "Creating ${cpam_user} user"
+New-LocalUser -Name ${cpam_user} -Password $Password -AccountNeverExpires -FullName ${cpam_user} -Description "User created for cpam tool." -PasswordNeverExpires
+Add-LocalGroupMember -Group "Administrators" -Member ${cpam_user}
+
+# Create Saviynt operations users
+for ( $IDCOUNT=1; $IDCOUNT -le 2; $IDCOUNT=$IDCOUNT+1 ) {
+  Write-Output "Creating ${cpam_adds}$IDCOUNT user"
+  New-LocalUser -Name ${cpam_adds}$IDCOUNT -Password $Password -AccountNeverExpires -FullName ${cpam_adds}$IDCOUNT -Description "User created for cpam tool." -PasswordNeverExpires
+  Add-LocalGroupMember -Group "Administrators" -Member ${cpam_adds}$IDCOUNT
+}
+
+Write-Output "Running Ansible Bootstrap"
+#### Ansible bootstrap
+[System.Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; [Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+$webClient = New-Object System.Net.WebClient; $webClient.DownloadFile('https://artifactory.alight.com/artifactory/devops-generic-local/ansible/scripts/AnsibleEC2Bootstrap.ps1', 'C:\Windows\Temp\AnsibleEC2Bootstrap.ps1');
+& C:\Windows\Temp\AnsibleEC2Bootstrap.ps1 -nocallback -environment ${ansible_environment} -automation '${ansible_automation}';
+remove-item -path "C:\Windows\Temp\AnsibleEC2Bootstrap.ps1" -Force -Recurse -ErrorAction Ignore
+
+# Apply security patches to mitigate known vulnerabilities
+$Updates = Start-WUScan
+Write-Host "Updates Found: " $Updates.Count
+if ($Updates.Count -gt 0) {
+  Install-WUUpdates -Updates $Updates
+  Write-Output "Windows Patches Installed Successfully"
+}
+
+Restart-Computer -Force
+) *>&1 > c:\windows\Temp\userdataout.txt
+}
+</powershell>
+<persist>true</persist>
+.tests = folder
+integrate.tf
+# variable "tags" {
+#   description = "Tags for resources"
+#   type        = map(string)
+#   default     = { Test = "Test" }
+# }
+
+
+module "ec2_win_17451" {
+  source             = "git::codecommit://module-aws-ec2-windows?ref=%BRANCH%"
+  ami_name           = "alight_windows2019datacenter*"
+  instance_type      = "t3.medium"
+  security_group_ids = ["sg-087a004937ce865e7"] # policy-staging-app-windows
+  vpc_group          = "policy-staging"
+  application        = "cpam-win-test"
+  environment        = "dv"
+  service            = "terraform"
+  tags               = {}
+
+  vpc_tier = "app"
+  hostname = "egi-app"
+  ec2_cert_required = true
+  cert_elb_vpc_tier  = "web"
+  cert_elb_subdomain = "gmcinspire5"
+}
+
+# module "ec2_win_default" {
+#   source             = "git::codecommit://module-aws-ec2-windows?ref=%BRANCH%"
+#   ami_name           = "alight_windows2019datacenter*"
+#   instance_type      = "t3.medium"
+#   security_group_ids = ["sg-087a004937ce865e7"] # policy-staging-app-windows
+#   vpc_group          = "policy-staging"
+#   application        = "tf-module-ci-test2"
+#   environment        = "dv"
+#   service            = "terraform"
+#   tags               = var.tags
+# }
+
+module "ec2_win_upgrade" {
+  source             = "git::codecommit://module-aws-ec2-windows?ref=%LATEST%"
+  ami_name           = "alight_windows2019datacenter*"
+  instance_type      = "t3.medium"
+  security_group_ids = ["sg-087a004937ce865e7"] # policy-staging-app-windows
+  vpc_group          = "policy-staging"
+  application        = "cpam-win-test-latest"
+  environment        = "dv"
+  service            = "terraform"
+  tags               = {}
+
+  vpc_tier = "app"
+  hostname = "ec2-winhost"
+  ec2_cert_required = true
+  cert_elb_vpc_tier  = "web"
+  cert_elb_subdomain = "elb-subdomain"
+}
+test.sh
+#!/bin/sh
+set -e # exit script on any non-zero status
+echo -e "\n*** grabbing latest git tag on $REPO_NAME ***\n"
+LATEST=$(git -c 'versionsort.suffix=-' ls-remote --exit-code --refs --sort='version:refname' --tags codecommit::us-east-1://$REPO_NAME '*.*.*' | tail --lines=1 | cut --delimiter='/' --fields=3)
+echo -e "\n*** replacing source placeholder %BRANCH% with $BRANCH_NAME and version placeholder %LATEST% with $LATEST ***\n"
+for i in *.tf; do [ -f "$i" ] || break; sed -i "s/%BRANCH%/$BRANCH_NAME/g" $i; sed -i "s/%LATEST%/$LATEST/g" $i; done 
+
+echo -e "\n*** NEW INIT ***\n"
+terraform init -plugin-dir=/bin/terraform-providers -upgrade
+
+echo -e "\n*** terraform destroy leftover resources from previous run ***\n"
+terraform destroy -auto-approve
+
+echo -e "\n*** NEW PLAN ***\n"
+terraform plan -out=tfplan
+
+echo -e "\n*** NEW APPLY ***\n"
+terraform apply -input=false tfplan #> apply.txt
+
+echo -e "\n*** REPEAT PLAN ***\n"
+terraform plan -out=tfplan
+
+echo -e "\n*** REPEAT APPLY ***\n"
+terraform apply -input=false tfplan #> apply.txt
+
+echo -e "\n*** replacing $LATEST module sources with $BRANCH_NAME ***\n"
+for i in *.tf; do [ -f "$i" ] || break; sed -i "s/$LATEST/$BRANCH_NAME/g" $i; done
+
+echo -e "\n*** UPGRADE INIT ***\n"
+terraform init -plugin-dir=/bin/terraform-providers -upgrade
+
+echo -e "\n*** UPGRADE PLAN ***\n"
+terraform plan -out=tfplan
+
+echo -e "\n*** UPGRADE APPLY ***\n"
+terraform apply -input=false tfplan 2>&1 | tee apply.txt
+
+echo -e "\n*** REPEAT UPGRADE PLAN ***\n"
+terraform plan -out=tfplan
+
+echo -e "\n*** REPEAT UPGRADE APPLY ***\n"
+terraform apply -input=false tfplan 2>&1 | tee apply.txt
+
+.gitignore:
+.terraform*
+terraform.*
+aws.tf
+README_new.md
+.idea
+bkp_init_primary.tpl
